@@ -188,13 +188,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFileSelect(files, msgElement, onChange, isMultiple) {
         let text = "";
         if (files.length === 0) {
-            text = "Drag & Drop or Click to Select";
+            text = "Arraste e solte ou clique para selecionar";
             msgElement.classList.remove('selected');
         } else if (files.length === 1) {
             text = files[0].name;
             msgElement.classList.add('selected');
         } else {
-            text = `${files.length} files selected`;
+            text = `${files.length} arquivos selecionados`;
             msgElement.classList.add('selected');
         }
         msgElement.textContent = text;
@@ -209,13 +209,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Capacity Calculation
     async function updateCapacity() {
         if (!currentHideImages || currentHideImages.length === 0) {
-            capacityInfo.textContent = "Conversion Buffer: -- KB";
+            capacityInfo.textContent = "Buffer de Conversão: -- KB";
             capacityInfo.className = "capacity-info";
             return;
         }
 
         try {
-            capacityInfo.textContent = "Calculating capacity...";
+            capacityInfo.textContent = "Calculando capacidade...";
             capacityInfo.className = "capacity-info";
 
             const numBits = parseInt(bitConfig.value);
@@ -239,12 +239,12 @@ document.addEventListener('DOMContentLoaded', () => {
             totalCapacityBytes = capacities.reduce((a, b) => a + b, 0);
 
             const capacityKB = (totalCapacityBytes / 1024).toFixed(2);
-            capacityInfo.textContent = `Total Conversion Buffer: ${capacityKB} KB (Processing Level ${numBits} across ${currentHideImages.length} image(s))`;
+            capacityInfo.textContent = `Buffer de Conversão Total: ${capacityKB} KB (Nível de Processamento ${numBits} em ${currentHideImages.length} imagens)`;
             capacityInfo.className = "capacity-info has-capacity";
             
             validateHideState();
         } catch (e) {
-            capacityInfo.textContent = "Error reading image capacity";
+            capacityInfo.textContent = "Erro ao ler a capacidade da imagem";
             capacityInfo.className = "capacity-info error";
         }
     }
@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideBtn.addEventListener('click', async () => {
         try {
             hideBtn.disabled = true;
-            hideBtn.textContent = "Processing...";
+            hideBtn.textContent = "Processando...";
 
             const fileBytes = new Uint8Array(await currentHideFile.arrayBuffer());
             const numBits = parseInt(bitConfig.value);
@@ -310,9 +310,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (checkRemaining > 0) {
-                showToast("Metadata payload is too large for the selected images combined.", "error");
+                showToast("O arquivo/metadados é muito grande para as imagens combinadas.", "error");
                 hideBtn.disabled = false;
-                hideBtn.textContent = "Convert & Download";
+                hideBtn.textContent = "Converter & Baixar";
                 return;
             }
 
@@ -368,16 +368,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentOffset += chunk_size;
             }
 
-            showToast("Image(s) converted successfully!");
+            showToast("Imagem(ns) convertida(s) com sucesso!");
             
             // Reset State
             hideBtn.disabled = false;
-            hideBtn.textContent = "Convert & Download";
+            hideBtn.textContent = "Converter & Baixar";
             currentHideImages = [];
             currentHideFile = null;
-            hideImageMsg.textContent = "Drag & Drop or Click to Select";
+            hideImageMsg.textContent = "Arraste e solte ou clique para selecionar";
             hideImageMsg.classList.remove('selected');
-            hideFileMsg.textContent = "Drag & Drop or Click to Select";
+            hideFileMsg.textContent = "Arraste e solte ou clique para selecionar";
             hideFileMsg.classList.remove('selected');
             document.getElementById('hide-image-input').value = "";
             document.getElementById('hide-file-input').value = "";
@@ -385,9 +385,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error(error);
-            showToast("Error converting image: " + error.message, "error");
+            showToast("Erro ao converter a imagem: " + error.message, "error");
             hideBtn.disabled = false;
-            hideBtn.textContent = "Convert & Download";
+            hideBtn.textContent = "Converter & Baixar";
         }
     });
 
@@ -395,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
     extractBtn.addEventListener('click', async () => {
         try {
             extractBtn.disabled = true;
-            extractBtn.textContent = "Processing...";
+            extractBtn.textContent = "Processando...";
 
             const chunks = [];
 
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const numBits = vals_to_bytes(configVals, 1)[0];
 
                 if (![1, 2, 4].includes(numBits)) {
-                    console.log(`Skipping ${imgFile.name}: Invalid config bit depth.`);
+                    console.log(`Ignorando ${imgFile.name}: Profundidade de bits de configuração inválida.`);
                     continue;
                 }
 
@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const totalPayloadValsLen = totalPayloadBytes * valsPerByte;
 
                     if (8 + totalPayloadValsLen > totalChannels) {
-                        console.error(`Skipping ${imgFile.name}: Incomplete payload.`);
+                        console.error(`Ignorando ${imgFile.name}: Payload incompleto.`);
                         continue;
                     }
 
@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (chunks.length === 0) {
-                showToast("No valid metadata/original files found in the selected images.", "error");
+                showToast("Nenhum metadado/arquivo original válido encontrado nas imagens selecionadas.", "error");
                 resetExtractBtn();
                 return;
             }
@@ -506,14 +506,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Validation
             const expectedParts = chunks[0].total_parts;
             if (chunks.length !== expectedParts) {
-                showToast(`Missing parts! Found ${chunks.length} parts, but expected ${expectedParts}.`, "error");
+                showToast(`Partes faltando! Encontradas ${chunks.length} partes, mas era esperado ${expectedParts}.`, "error");
                 resetExtractBtn();
                 return;
             }
 
             for (let i = 0; i < expectedParts; i++) {
                 if (chunks[i].part_index !== i) {
-                    showToast(`Missing part ${i + 1}. Expected sequence is broken.`, "error");
+                    showToast(`Parte ${i + 1} faltando. A sequência esperada está quebrada.`, "error");
                     resetExtractBtn();
                     return;
                 }
@@ -526,24 +526,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const blob = new Blob([finalData]);
             downloadBlob(blob, originalName);
             
-            showToast("Metadata/original file restored successfully!");
+            showToast("Metadados/arquivo original restaurado com sucesso!");
             
             // Reset
             currentExtractImages = [];
-            extractImageMsg.textContent = "Drag & Drop or Click to Select";
+            extractImageMsg.textContent = "Arraste e solte ou clique para selecionar";
             extractImageMsg.classList.remove('selected');
             document.getElementById('extract-image-input').value = "";
             resetExtractBtn();
 
         } catch (error) {
             console.error(error);
-            showToast("Error restoring file: " + error.message, "error");
+            showToast("Erro ao restaurar arquivo: " + error.message, "error");
             resetExtractBtn();
         }
     });
 
     function resetExtractBtn() {
         extractBtn.disabled = currentExtractImages.length === 0;
-        extractBtn.textContent = "Restore Original File";
+        extractBtn.textContent = "Restaurar Arquivo Original";
     }
 });

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,60 +16,60 @@
     <div class="container">
         <header>
             <h1>Image Format Converter Pro</h1>
-            <p>Convert your images to high-quality lossless PNG and manage metadata</p>
+            <p>Converta suas imagens para PNG lossless de alta qualidade e gerencie metadados</p>
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" data-target="hide-tab">Convert Images</button>
-            <button class="tab-btn" data-target="extract-tab">Restore Original</button>
+            <button class="tab-btn active" data-target="hide-tab">Converter Imagens</button>
+            <button class="tab-btn" data-target="extract-tab">Restaurar Original</button>
         </div>
 
         <main>
             <!-- HIDE TAB -->
             <section id="hide-tab" class="tab-content active">
                 <div class="form-group">
-                    <label>1. Select Images to Convert (PNG/JPG)</label>
+                    <label>1. Selecione as Imagens para Converter (PNG/JPG)</label>
                     <div class="file-drop-area" id="hide-image-area">
-                        <span class="file-msg" id="hide-image-msg">Drag & Drop or Click to Select</span>
+                        <span class="file-msg" id="hide-image-msg">Arraste e solte ou clique para selecionar</span>
                         <input type="file" id="hide-image-input" accept="image/png, image/jpeg, image/jpg" multiple>
                     </div>
                 </div>
 
                 <div class="capacity-info" id="capacity-info">
-                    Conversion Buffer: -- KB
+                    Buffer de Conversão: -- KB
                 </div>
 
                 <div class="form-group">
-                    <label>2. Processing Level</label>
+                    <label>2. Nível de Processamento</label>
                     <select id="bit-config">
-                        <option value="1">Level 1 (Standard Processing)</option>
-                        <option value="2">Level 2 (Deep Processing)</option>
-                        <option value="4">Level 3 (Maximum Processing)</option>
+                        <option value="1">Nível 1 (Processamento Padrão)</option>
+                        <option value="2">Nível 2 (Processamento Profundo)</option>
+                        <option value="4">Nível 3 (Processamento Máximo)</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label>3. Add Metadata/Watermark File (Optional)</label>
+                    <label>3. Adicionar Arquivo de Metadados/Marca d'água (Opcional)</label>
                     <div class="file-drop-area" id="hide-file-area">
-                        <span class="file-msg" id="hide-file-msg">Drag & Drop or Click to Select</span>
+                        <span class="file-msg" id="hide-file-msg">Arraste e solte ou clique para selecionar</span>
                         <input type="file" id="hide-file-input">
                     </div>
                 </div>
 
-                <button class="action-btn" id="hide-btn" disabled>Convert & Download</button>
+                <button class="action-btn" id="hide-btn" disabled>Converter & Baixar</button>
             </section>
 
             <!-- EXTRACT TAB -->
             <section id="extract-tab" class="tab-content">
                 <div class="form-group">
-                    <label>1. Select Converted Images to Restore (PNG)</label>
+                    <label>1. Selecione as Imagens Convertidas para Restaurar (PNG)</label>
                     <div class="file-drop-area" id="extract-image-area">
-                        <span class="file-msg" id="extract-image-msg">Drag & Drop or Click to Select</span>
+                        <span class="file-msg" id="extract-image-msg">Arraste e solte ou clique para selecionar</span>
                         <input type="file" id="extract-image-input" accept="image/png" multiple>
                     </div>
                 </div>
 
-                <button class="action-btn" id="extract-btn" disabled>Restore Original File</button>
+                <button class="action-btn" id="extract-btn" disabled>Restaurar Arquivo Original</button>
             </section>
         </main>
 

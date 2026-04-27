@@ -33,6 +33,16 @@ function bytes_to_vals(data_bytes, num_bits) {
             const b = data_bytes[i];
             for (let j = 4; j >= 0; j -= 4) vals.push((b >> j) & 15);
         }
+    } else if (num_bits === 3) {
+        // Modo Blindado: 1 bit -> 3 canais, usando valores 0 ou 3 para maior distância
+        for (let i = 0; i < data_bytes.length; i++) {
+            const b = data_bytes[i];
+            for (let j = 7; j >= 0; j--) {
+                const bit = (b >> j) & 1;
+                const rv = bit * 3; // 0 ou 3
+                vals.push(rv, rv, rv); // Repete 3 vezes
+            }
+        }
     }
     return vals;
 }
@@ -55,6 +65,22 @@ function vals_to_bytes(vals, num_bits) {
         for (let i = 0; i < vals.length; i += 2) {
             let b = 0;
             for (let j = 0; j < 2; j++) b = (b << 4) | vals[i + j];
+            data_bytes.push(b);
+        }
+    } else if (num_bits === 3) {
+        // Modo Blindado: Extração por votação majoritária e threshold
+        for (let i = 0; i < vals.length; i += 24) { // 8 bits * 3 canais cada
+            let b = 0;
+            for (let j = 0; j < 8; j++) {
+                // Pega os 3 valores repetidos para o mesmo bit
+                const v1 = vals[i + j*3] >= 2 ? 1 : 0;
+                const v2 = vals[i + j*3 + 1] >= 2 ? 1 : 0;
+                const v3 = vals[i + j*3 + 2] >= 2 ? 1 : 0;
+                
+                // Votação majoritária
+                const bit = (v1 + v2 + v3) >= 2 ? 1 : 0;
+                b = (b << 1) | bit;
+            }
             data_bytes.push(b);
         }
     }
@@ -291,8 +317,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     img.onload = () => {
                         const width = img.width;
                         const height = img.height;
-                        const capacityBits = ((width * height * 3) - 8) * numBits;
-                        resolve(Math.floor(capacityBits / 8));
+                        const totalChannels = (width * height * 3) - 8;
+                        
+                        let capacity;
+                        if (numBits === 3) {
+                            // Modo Blindado: 24 canais por byte (8 bits * 3 repetições)
+                            capacity = Math.floor(totalChannels / 24);
+                        } else {
+                            const capacityBits = totalChannels * numBits;
+                            capacity = Math.floor(capacityBits / 8);
+                        }
+                        resolve(capacity);
                     };
                     img.onerror = () => resolve(0);
                     img.src = URL.createObjectURL(file);
@@ -399,7 +434,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const totalChannels = (imageData.width * imageData.height * 3) - 8;
-                const maxBytesAvailable = Math.floor((totalChannels * numBits) / 8);
+                let maxBytesAvailable;
+                if (numBits === 3) {
+                    maxBytesAvailable = Math.floor(totalChannels / 24);
+                } else {
+                    maxBytesAvailable = Math.floor((totalChannels * numBits) / 8);
+                }
                 const maxPayloadChunk = maxBytesAvailable - headerBytesLength;
 
                 if (maxPayloadChunk > 0) {
@@ -465,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Write Payload
-                const mask = 256 - (1 << numBits);
+                const mask = numBits === 3 ? 252 : (256 - (1 << numBits));
                 for (let i = 0; i < payloadVals.length; i++) {
                     const idx = getRgbIndex(i + 8);
                     data[idx] = (data[idx] & mask) | payloadVals[i];
@@ -538,13 +578,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const numBits = vals_to_bytes(configVals, 1)[0];
 
-                if (![1, 2, 4].includes(numBits)) {
+                if (![1, 2, 4, 3].includes(numBits)) {
                     console.log(`Ignorando ${imgFile.name}: Profundidade de bits de configuração inválida.`);
                     continue;
                 }
 
-                const valsPerByte = 8 / numBits;
-                const mask = (1 << numBits) - 1;
+                let valsPerByte;
+                let mask;
+                if (numBits === 3) {
+                    valsPerByte = 24; // 8 bits * 3 canais
+                    mask = 3; // 2 bits (0 ou 3)
+                } else {
+                    valsPerByte = 8 / numBits;
+                    mask = (1 << numBits) - 1;
+                }
                 
                 // Read enough bytes to check V2 header (12 bytes)
                 const headerLen = 12;

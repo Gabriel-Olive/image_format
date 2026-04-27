@@ -387,15 +387,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Save
                 const canvas = document.getElementById('canvas');
+                // IMPORTANTE: Redimensionar o canvas para cada imagem individual
+                canvas.width = imgData.imageData.width;
+                canvas.height = imgData.imageData.height;
+                
                 const ctx = canvas.getContext('2d');
                 ctx.putImageData(imgData.imageData, 0, 0);
                 
                 await new Promise(resolve => {
                     canvas.toBlob((blob) => {
-                        let baseName = currentHideFile.name.split('.')[0];
-                        let filename = totalPartsNeeded === 1 ? `${baseName}_hidden.png` : `${baseName}_part${partIndex+1}.png`;
+                        let originalFullName = currentHideFile.name;
+                        let lastDotIndex = originalFullName.lastIndexOf('.');
+                        let baseName = lastDotIndex !== -1 ? originalFullName.substring(0, lastDotIndex) : originalFullName;
+                        
+                        let filename = totalPartsNeeded === 1 ? `${baseName}_convertido.png` : `${baseName}_part${partIndex+1}.png`;
                         downloadBlob(blob, filename);
-                        setTimeout(resolve, 300); // Slight delay to let browser handle multiple downloads
+                        setTimeout(resolve, 300);
                     }, 'image/png');
                 });
 
@@ -465,9 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const headerBytes = vals_to_bytes(headerVals, numBits);
                 
-                // Check if V2
+                // Verificar se é Protocolo V2 (Marca d'água 0xCA 0x8A)
                 if (headerBytes[0] === 0xCA && headerBytes[1] === 0x8A) {
-                    // V2 Protocol
                     const chunkSize = bytesToInt(headerBytes.slice(2, 6));
                     const nameSize = bytesToInt(headerBytes.slice(6, 8));
                     const totalParts = bytesToInt(headerBytes.slice(8, 10));
@@ -477,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const totalPayloadValsLen = totalPayloadBytes * valsPerByte;
 
                     if (8 + totalPayloadValsLen > totalChannels) {
-                        console.error(`Ignorando ${imgFile.name}: Payload incompleto.`);
+                        console.error(`Ignorando ${imgFile.name}: Payload incompleto para o tamanho declarado.`);
                         continue;
                     }
 
@@ -491,6 +497,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const originalName = new TextDecoder('utf-8').decode(nameBytes);
                     const chunkData = allBytes.slice(12 + nameSize);
 
+                    console.log(`Sucesso: Extraída parte ${partIndex+1}/${totalParts} de "${originalName}" (${chunkSize} bytes)`);
+
                     chunks.push({
                         part_index: partIndex,
                         total_parts: totalParts,
@@ -498,33 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         chunkData: chunkData
                     });
                 } else {
-                    // V1 Protocol Fallback (from previous version)
-                    const fileSize = bytesToInt(headerBytes.slice(0, 4));
-                    const nameSize = bytesToInt(headerBytes.slice(4, 6));
-
-                    if (fileSize <= 0 || nameSize <= 0) continue;
-
-                    const totalPayloadBytes = 6 + nameSize + fileSize;
-                    const totalPayloadValsLen = totalPayloadBytes * valsPerByte;
-
-                    if (8 + totalPayloadValsLen > totalChannels) continue;
-
-                    const payloadValsArray = new Uint8Array(totalPayloadValsLen);
-                    for (let i = 0; i < totalPayloadValsLen; i++) {
-                        payloadValsArray[i] = data[getRgbIndex(i + 8)] & mask;
-                    }
-
-                    const allBytes = vals_to_bytes(payloadValsArray, numBits);
-                    const nameBytes = allBytes.slice(6, 6 + nameSize);
-                    const originalName = new TextDecoder('utf-8').decode(nameBytes);
-                    const fileData = allBytes.slice(6 + nameSize);
-
-                    chunks.push({
-                        part_index: 0,
-                        total_parts: 1,
-                        originalName: originalName,
-                        chunkData: fileData
-                    });
+                    console.warn(`A imagem ${imgFile.name} não contém metadados válidos (Protocolo V2 não detectado).`);
                 }
             }
 

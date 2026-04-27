@@ -255,9 +255,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Setup Hide File Inputs
     setupFileDropArea('hide-image-area', 'hide-image-input', 'hide-image-msg', (files) => {
-        currentHideImages = files;
+        currentHideImages = Array.from(files);
         updateCapacity();
     }, true);
+
+    // Permitir colar imagens com Ctrl+V
+    document.addEventListener('paste', (e) => {
+        // Verificar se estamos na aba de esconder
+        const activeTab = document.querySelector('.tab-btn.active');
+        if (!activeTab || activeTab.dataset.target !== 'hide-tab') return;
+
+        const items = e.clipboardData.items;
+        let imagePasted = false;
+        
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+                    const newFile = new File([file], `colado_${dateStr}.png`, { type: file.type });
+                    
+                    if (!Array.isArray(currentHideImages)) {
+                        currentHideImages = Array.from(currentHideImages || []);
+                    }
+                    currentHideImages.push(newFile);
+                    imagePasted = true;
+                }
+            }
+        }
+
+        if (imagePasted) {
+            const msgElement = document.getElementById('hide-image-msg');
+            msgElement.classList.add('selected');
+            msgElement.textContent = `${currentHideImages.length} arquivos selecionados`;
+            updateCapacity();
+            showToast("Imagem colada da área de transferência!");
+        }
+    });
 
     setupFileDropArea('hide-file-area', 'hide-file-input', 'hide-file-msg', (file) => {
         currentHideFile = file;
@@ -375,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hideBtn.textContent = "Converter & Baixar";
             currentHideImages = [];
             currentHideFile = null;
-            hideImageMsg.textContent = "Arraste e solte ou clique para selecionar";
+            hideImageMsg.textContent = "Arraste, clique ou cole (Ctrl+V) para selecionar";
             hideImageMsg.classList.remove('selected');
             hideFileMsg.textContent = "Arraste e solte ou clique para selecionar";
             hideFileMsg.classList.remove('selected');

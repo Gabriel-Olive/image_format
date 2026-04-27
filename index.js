@@ -435,6 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const data = imgData.imageData.data;
 
+                // --- NOVO: Forçar Alpha 255 para evitar corrupção de cor pelo navegador ---
+                for (let i = 3; i < data.length; i += 4) {
+                    data[i] = 255;
+                }
+
                 // Write Config (1 bit mask: 254)
                 for (let i = 0; i < 8; i++) {
                     const idx = getRgbIndex(i);
@@ -558,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const allBytes = vals_to_bytes(payloadValsArray, numBits);
                     const nameBytes = allBytes.slice(12, 12 + nameSize);
                     const originalName = new TextDecoder('utf-8').decode(nameBytes);
-                    const chunkData = allBytes.slice(12 + nameSize);
+                    const chunkData = allBytes.slice(12 + nameSize, 12 + nameSize + chunkSize);
 
                     chunks.push({
                         part_index: partIndex,
@@ -588,7 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const allBytes = vals_to_bytes(payloadValsArray, numBits);
                             const nameBytes = allBytes.slice(6, 6 + nameSize);
                             const originalName = new TextDecoder('utf-8').decode(nameBytes);
-                            const chunkData = allBytes.slice(6 + nameSize);
+                            const chunkData = allBytes.slice(6 + nameSize, 6 + nameSize + fileSize);
 
                             chunks.push({
                                 part_index: 0,

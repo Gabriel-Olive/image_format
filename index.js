@@ -119,6 +119,52 @@ function loadImageData(file) {
     });
 }
 
+function detectExistingData(imageData) {
+    const data = imageData.data;
+    const totalChannels = (imageData.width * imageData.height * 3) - 8;
+
+    // Extract Config (first 8 channels)
+    const configVals = [];
+    for (let i = 0; i < 8; i++) {
+        configVals.push(data[getRgbIndex(i)] & 1);
+    }
+    const numBits = vals_to_bytes(configVals, 1)[0];
+
+    if (![1, 2, 4].includes(numBits)) {
+        return false;
+    }
+
+    const valsPerByte = 8 / numBits;
+    const mask = (1 << numBits) - 1;
+    
+    // Read enough bytes to check V2 header (12 bytes)
+    const headerLen = 12;
+    const headerValsLen = headerLen * valsPerByte;
+    if (headerValsLen > totalChannels) return false;
+
+    const headerVals = [];
+    for (let i = 0; i < headerValsLen; i++) {
+        headerVals.push(data[getRgbIndex(i + 8)] & mask);
+    }
+    
+    const headerBytes = vals_to_bytes(headerVals, numBits);
+    
+    // Protocol V2 (0xCA 0x8A)
+    if (headerBytes[0] === 0xCA && headerBytes[1] === 0x8A) {
+        return "V2";
+    } 
+    
+    // Fallback Protocol V1
+    const fileSize = bytesToInt(headerBytes.slice(0, 4));
+    const nameSize = bytesToInt(headerBytes.slice(4, 6));
+
+    if (fileSize > 0 && fileSize < totalChannels && nameSize > 0 && nameSize < 255) {
+        return "V1";
+    }
+
+    return false;
+}
+
 // --- Main App Logic ---
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -315,8 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const fileBytes = new Uint8Array(await currentHideFile.arrayBuffer());
             const numBits = parseInt(bitConfig.value);
             
-            // 1. Calculate how many parts we need
+            // 1. Calculate how many parts we need and check for existing data
             const processedImages = [];
+            const imagesWithData = [];
             let remainingBytesToFit = fileBytes.length;
             const nameBytes = new TextEncoder().encode(currentHideFile.name);
             const nameLenBytes = intToBytes(nameBytes.length, 2);
@@ -326,6 +373,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (const imgFile of currentHideImages) {
                 const imageData = await loadImageData(imgFile);
+                
+                // --- NOVO: Verificação de dados existentes ---
+                const existingProtocol = detectExistingData(imageData);
+                if (existingProtocol) {
+                    imagesWithData.push(imgFile.name);
+                }
+
                 const totalChannels = (imageData.width * imageData.height * 3) - 8;
                 const maxBytesAvailable = Math.floor((totalChannels * numBits) / 8);
                 const maxPayloadChunk = maxBytesAvailable - headerBytesLength;
@@ -333,6 +387,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (maxPayloadChunk > 0) {
                     processedImages.push({ imgFile, imageData, maxPayloadChunk });
                 }
+            }
+
+            // --- NOVO: Bloquear se houver dados ---
+            if (imagesWithData.length > 0) {
+                const names = imagesWithData.join(", ");
+                showToast(`Operação cancelada: As seguintes imagens já contêm dados: ${names}`, "error");
+                hideBtn.disabled = false;
+                hideBtn.textContent = "Converter & Baixar";
+                return;
             }
 
             let totalPartsNeeded = 0;

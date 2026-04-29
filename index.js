@@ -1,4 +1,5 @@
 // --- Utility Functions ---
+console.log("%c Image Format Converter Pro - Engine v4.0.0-PRO Ativa ", "background: #3b82f6; color: white; font-weight: bold; padding: 4px; border-radius: 4px;");
 
 let crcTable = null;
 function makeCRCTable() {
@@ -165,6 +166,7 @@ async function loadImageData(file) {
             colorSpace: 'srgb'
         });
         
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(bitmap, 0, 0);
         return ctx.getImageData(0, 0, canvas.width, canvas.height);
     } catch (e) {
@@ -622,6 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 canvas.height = imgData.imageData.height;
                 
                 const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+                ctx.imageSmoothingEnabled = false;
                 ctx.putImageData(imgData.imageData, 0, 0);
                 
                 await new Promise(resolve => {

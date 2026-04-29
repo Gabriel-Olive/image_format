@@ -24,6 +24,27 @@ function crc32(data) {
     return (crc ^ (-1)) >>> 0;
 }
 
+function detectCanvasInterference() {
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 10;
+    testCanvas.height = 10;
+    const testCtx = testCanvas.getContext('2d', { alpha: false });
+    
+    // Testa uma cor específica
+    const testColor = [123, 210, 55];
+    testCtx.fillStyle = `rgb(${testColor[0]}, ${testColor[1]}, ${testColor[2]})`;
+    testCtx.fillRect(0, 0, 10, 10);
+    
+    const readData = testCtx.getImageData(5, 5, 1, 1).data;
+    const isTampered = readData[0] !== testColor[0] || readData[1] !== testColor[1] || readData[2] !== testColor[2];
+    
+    if (isTampered) {
+        console.warn("Detectada interferência no Canvas! O navegador está alterando os pixels (Fingerprinting Protection).");
+        console.log(`Esperado: ${testColor}, Obtido: ${[readData[0], readData[1], readData[2]]}`);
+    }
+    return isTampered;
+}
+
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
@@ -240,6 +261,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // UI Elements
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    
+    // Check for interference
+    if (detectCanvasInterference()) {
+        const warning = document.createElement('div');
+        warning.style.cssText = "background: #7f1d1d; color: #fecaca; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; text-align: center; border: 1px solid #f87171;";
+        warning.innerHTML = "<strong>⚠️ Alerta de Interferência:</strong> O seu navegador está alterando os pixels desta página (Proteção de Fingerprinting). Isso impedirá a restauração correta de arquivos. Por favor, desative proteções de rastreamento ou use o modo anônimo.";
+        document.querySelector('main').prepend(warning);
+        showToast("Interferência detectada no navegador!", "error");
+    }
     
     const hideImageInput = document.getElementById('hide-image-input');
     const hideImageMsg = document.getElementById('hide-image-msg');

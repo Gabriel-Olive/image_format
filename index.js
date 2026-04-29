@@ -1,5 +1,28 @@
 // --- Utility Functions ---
 
+let crcTable = null;
+function makeCRCTable() {
+    let c;
+    let table = [];
+    for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+            c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+        }
+        table[n] = c;
+    }
+    return table;
+}
+
+function crc32(data) {
+    crcTable = crcTable || makeCRCTable();
+    let crc = 0 ^ (-1);
+    for (let i = 0; i < data.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ data[i]) & 0xFF];
+    }
+    return (crc ^ (-1)) >>> 0;
+}
+
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
@@ -228,6 +251,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const extractImageMsg = document.getElementById('extract-image-msg');
     const extractBtn = document.getElementById('extract-btn');
 
+    // V4 UI Elements
+    const v4FileInput = document.getElementById('v4-file-input');
+    const v4FileMsg = document.getElementById('v4-file-msg');
+    const v4GenBtn = document.getElementById('v4-gen-btn');
+    let currentV4File = null;
+
     // State
     let currentHideImages = [];
     let currentHideFile = null;
@@ -405,6 +434,76 @@ document.addEventListener('DOMContentLoaded', () => {
         extractBtn.disabled = currentExtractImages.length === 0;
     }, true);
 
+    setupFileDropArea('v4-file-area', 'v4-file-input', 'v4-file-msg', (file) => {
+        currentV4File = file;
+        v4GenBtn.disabled = !currentV4File;
+    }, false);
+
+    // V4 Generator Logic
+    v4GenBtn.addEventListener('click', async () => {
+        try {
+            v4GenBtn.disabled = true;
+            v4GenBtn.textContent = "Gerando...";
+
+            const fileBytes = new Uint8Array(await currentV4File.arrayBuffer());
+            const nameBytes = new TextEncoder().encode(currentV4File.name);
+            const nameLenBytes = intToBytes(nameBytes.length, 2);
+            const dataLenBytes = intToBytes(fileBytes.length, 4);
+            const checksum = crc32(fileBytes);
+            const checksumBytes = intToBytes(checksum, 4);
+            const magicBytes = new Uint8Array([0xCA, 0x8C]);
+
+            const payload = concatUint8Arrays([
+                magicBytes, nameLenBytes, dataLenBytes, checksumBytes, nameBytes, fileBytes
+            ]);
+
+            // Cada bloco de 4x4 pixels guarda 3 bytes (RGB)
+            const numBlocks = Math.ceil(payload.length / 3);
+            const sideBlocks = Math.ceil(Math.sqrt(numBlocks));
+            const blockSize = 4;
+            const imgSize = sideBlocks * blockSize;
+
+            const canvas = document.getElementById('canvas');
+            canvas.width = imgSize;
+            canvas.height = imgSize;
+            const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+            
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, imgSize, imgSize);
+
+            for (let i = 0; i < numBlocks; i++) {
+                const r = payload[i * 3] || 0;
+                const g = payload[i * 3 + 1] || 0;
+                const b = payload[i * 3 + 2] || 0;
+
+                const blockX = (i % sideBlocks) * blockSize;
+                const blockY = Math.floor(i / sideBlocks) * blockSize;
+
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(blockX, blockY, blockSize, blockSize);
+            }
+
+            canvas.toBlob((blob) => {
+                downloadBlob(blob, `QR_Data_${currentV4File.name}.png`);
+                showToast("Imagem V4 gerada com sucesso!");
+                v4GenBtn.disabled = false;
+                v4GenBtn.textContent = "Gerar Imagem de Dados";
+                
+                // Reset
+                currentV4File = null;
+                v4FileMsg.textContent = "Arraste e solte ou clique para selecionar";
+                v4FileMsg.classList.remove('selected');
+                v4FileInput.value = "";
+            }, 'image/png');
+
+        } catch (error) {
+            console.error(error);
+            showToast("Erro ao gerar V4: " + error.message, "error");
+            v4GenBtn.disabled = false;
+            v4GenBtn.textContent = "Gerar Imagem de Dados";
+        }
+    });
+
     // Hide Logic
     hideBtn.addEventListener('click', async () => {
         try {
@@ -421,8 +520,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const nameBytes = new TextEncoder().encode(currentHideFile.name);
             const nameLenBytes = intToBytes(nameBytes.length, 2);
             
-            // Header V2 is 12 bytes + name length
-            const headerBytesLength = 12 + nameBytes.length;
+            // Header V3 is 16 bytes + name length
+            const headerBytesLength = 16 + nameBytes.length;
 
             for (const imgFile of currentHideImages) {
                 const imageData = await loadImageData(imgFile);
@@ -474,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Embed into images
             let currentOffset = 0;
             const totalPartsBytes = intToBytes(totalPartsNeeded, 2);
-            const magicBytes = new Uint8Array([0xCA, 0x8A]);
+            const magicBytes = new Uint8Array([0xCA, 0x8B]); // Protocolo V3
 
             for (let partIndex = 0; partIndex < totalPartsNeeded; partIndex++) {
                 const imgData = processedImages[partIndex];
@@ -483,9 +582,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const sizeBytes = intToBytes(chunk_size, 4);
                 const partIndexBytes = intToBytes(partIndex, 2);
+                const checksum = crc32(chunkBytes);
+                const checksumBytes = intToBytes(checksum, 4);
 
                 const payloadBytes = concatUint8Arrays([
-                    magicBytes, sizeBytes, nameLenBytes, totalPartsBytes, partIndexBytes, nameBytes, chunkBytes
+                    magicBytes, sizeBytes, nameLenBytes, totalPartsBytes, partIndexBytes, checksumBytes, nameBytes, chunkBytes
                 ]);
 
                 const configVals = bytes_to_vals(new Uint8Array([numBits]), 1);
@@ -506,6 +607,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Write Payload
                 const mask = numBits === 3 ? 252 : (256 - (1 << numBits));
+                console.log(`[CONVERSÃO] Gravando partIndex ${partIndex} com numBits=${numBits}, mask=${mask}, payloadLength=${payloadBytes.length}`);
+                if (numBits === 3) console.log(`[CONVERSÃO] Exemplo dos primeiros 5 vals blindados: ${payloadVals.slice(0, 15)}`);
+
                 for (let i = 0; i < payloadVals.length; i++) {
                     const idx = getRgbIndex(i + 8);
                     data[idx] = (data[idx] & mask) | payloadVals[i];
@@ -571,12 +675,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = imageData.data;
                 const totalChannels = imageData.width * imageData.height * 3;
 
+                // --- DETECÇÃO V4 (Modo QR) ---
+                // Verifica o centro do primeiro bloco (coordenada 2,2 em um bloco 4x4)
+                if (imageData.width >= 4 && imageData.height >= 4) {
+                    const firstPixelIdx = (2 * imageData.width + 2) * 4;
+                    if (data[firstPixelIdx] === 0xCA && data[firstPixelIdx + 1] === 0x8C) {
+                        const blockSize = 4;
+                        const sideBlocks = imageData.width / blockSize;
+                        const numBlocks = sideBlocks * (imageData.height / blockSize);
+                        
+                        const extractedBytes = [];
+                        for (let i = 0; i < numBlocks; i++) {
+                            const blockX = (i % sideBlocks) * blockSize;
+                            const blockY = Math.floor(i / sideBlocks) * blockSize;
+                            const centerX = blockX + 2;
+                            const centerY = blockY + 2;
+                            const idx = (centerY * imageData.width + centerX) * 4;
+                            extractedBytes.push(data[idx], data[idx + 1], data[idx + 2]);
+                        }
+                        
+                        const allBytes = new Uint8Array(extractedBytes);
+                        const nameLen = bytesToInt(allBytes.slice(2, 4));
+                        const dataLen = bytesToInt(allBytes.slice(4, 8));
+                        const expectedChecksum = bytesToInt(allBytes.slice(8, 12));
+                        
+                        const nameBytes = allBytes.slice(12, 12 + nameLen);
+                        const originalName = new TextDecoder('utf-8').decode(nameBytes);
+                        const chunkData = allBytes.slice(12 + nameLen, 12 + nameLen + dataLen);
+                        
+                        const actualChecksum = crc32(chunkData);
+                        if (actualChecksum !== expectedChecksum) {
+                            showToast(`AVISO: Imagem V4 "${imgFile.name}" corrompida (Erro de Checksum).`, "error");
+                        }
+
+                        chunks.push({
+                            part_index: 0,
+                            total_parts: 1,
+                            originalName: originalName,
+                            chunkData: chunkData,
+                            version: 'V4'
+                        });
+                        console.log(`Detectado V4: ${originalName}`);
+                        continue;
+                    }
+                }
+
                 // Extract Config
                 const configVals = [];
                 for (let i = 0; i < 8; i++) {
                     configVals.push(data[getRgbIndex(i)] & 1);
                 }
                 const numBits = vals_to_bytes(configVals, 1)[0];
+                console.log(`[EXTRAÇÃO] Imagem: ${imgFile.name}, numBits Detectado: ${numBits}`);
 
                 if (![1, 2, 4, 3].includes(numBits)) {
                     console.log(`Ignorando ${imgFile.name}: Profundidade de bits de configuração inválida.`);
@@ -604,9 +754,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 const headerBytes = vals_to_bytes(headerVals, numBits);
+                console.log(`[EXTRAÇÃO] Header Bytes (Hex): ${Array.from(headerBytes).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
                 
+                // --- Protocolo V3 (0xCA 0x8B) com Checksum ---
+                if (headerBytes[0] === 0xCA && headerBytes[1] === 0x8B) {
+                    const chunkSize = bytesToInt(headerBytes.slice(2, 6));
+                    const nameSize = bytesToInt(headerBytes.slice(6, 8));
+                    const totalParts = bytesToInt(headerBytes.slice(8, 10));
+                    const partIndex = bytesToInt(headerBytes.slice(10, 12));
+                    const expectedChecksum = bytesToInt(headerBytes.slice(12, 16));
+
+                    const totalPayloadBytes = 16 + nameSize + chunkSize;
+                    const totalPayloadValsLen = totalPayloadBytes * valsPerByte;
+
+                    if (8 + totalPayloadValsLen > totalChannels) {
+                        console.error(`Ignorando ${imgFile.name}: Payload excede tamanho da imagem.`);
+                        continue;
+                    }
+
+                    const payloadValsArray = new Uint8Array(totalPayloadValsLen);
+                    for (let i = 0; i < totalPayloadValsLen; i++) {
+                        payloadValsArray[i] = data[getRgbIndex(i + 8)] & mask;
+                    }
+
+                    const allBytes = vals_to_bytes(payloadValsArray, numBits);
+                    const nameBytes = allBytes.slice(16, 16 + nameSize);
+                    const originalName = new TextDecoder('utf-8').decode(nameBytes);
+                    const chunkData = allBytes.slice(16 + nameSize, 16 + nameSize + chunkSize);
+
+                    // Validação de Integridade
+                    const actualChecksum = crc32(chunkData);
+                    if (actualChecksum !== expectedChecksum) {
+                        showToast(`AVISO: Parte ${partIndex + 1} da imagem "${imgFile.name}" parece estar corrompida (Erro de Checksum).`, "error");
+                        console.error(`Erro de Checksum em ${imgFile.name}: Esperado ${expectedChecksum}, Obtido ${actualChecksum}`);
+                    }
+
+                    chunks.push({
+                        part_index: partIndex,
+                        total_parts: totalParts,
+                        originalName: originalName,
+                        chunkData: chunkData,
+                        version: 'V3'
+                    });
+                    console.log(`Detectado V3: Part ${partIndex+1}/${totalParts} de ${originalName}`);
+                } 
                 // --- Protocolo V2 (0xCA 0x8A) ---
-                if (headerBytes[0] === 0xCA && headerBytes[1] === 0x8A) {
+                else if (headerBytes[0] === 0xCA && headerBytes[1] === 0x8A) {
                     const chunkSize = bytesToInt(headerBytes.slice(2, 6));
                     const nameSize = bytesToInt(headerBytes.slice(6, 8));
                     const totalParts = bytesToInt(headerBytes.slice(8, 10));

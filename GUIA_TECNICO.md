@@ -36,6 +36,18 @@ O **Protocolo V4** é uma mudança de paradigma: em vez de esconder dados em uma
 ### 4. Correção de Redimensionamento do Canvas
 Um erro crítico foi corrigido onde o canvas interno mantinha as dimensões da imagem anterior ao processar múltiplos arquivos. Agora, o canvas é redimensionado exatamente para as dimensões de cada imagem antes de salvar, garantindo a integridade dos pixels.
 
+## 🛡️ Solução de Problemas: Erro de Checksum / Interferência
+
+Se você receber um **Alerta de Interferência** ou erros de Checksum ao usar a versão web (GitHub Pages), o culpado é o **Canvas Fingerprinting Protection** do seu navegador.
+
+### O que acontece:
+Navegadores focados em privacidade (como Brave, Firefox ou extensões como Privacy Badger) alteram sutilmente os pixels das imagens geradas por scripts para evitar que sites identifiquem você. Como nosso sistema depende da cor **exata** de cada pixel, essa alteração destrói os dados.
+
+### Como resolver:
+1. **Desative o bloqueio:** Clique no ícone de escudo/leão na barra de endereços e permita que o site use o Canvas sem restrições.
+2. **Use modo anônimo:** Muitas vezes, abrir em uma aba anônima desativa as extensões que causam o problema.
+3. **Versão Local:** Se preferir segurança máxima, use a versão local (abrindo o `index.html` direto do seu PC), onde os navegadores geralmente não aplicam essa restrição.
+
 ## 🛠 Como usar para resultados profissionais
 
 ### Para ocultar metadados:
